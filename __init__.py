@@ -1,8 +1,4 @@
-__version__ = '1.0.8'
-
-import os, pathlib
-from meerschaum.config._paths import PLUGINS_TEMP_RESOURCES_PATH
-cookies_path = pathlib.Path(os.path.join(PLUGINS_TEMP_RESOURCES_PATH, 'apex_cookies.pkl'))
+__version__ = '1.0.9'
 
 driver = None
 geckodriver_location = None
@@ -30,6 +26,104 @@ def exit_handler():
         pass
 atexit.register(exit_handler)
 
+import os, pathlib
+from meerschaum.config._paths import PLUGINS_TEMP_RESOURCES_PATH
+cookies_path = pathlib.Path(os.path.join(PLUGINS_TEMP_RESOURCES_PATH, 'apex_cookies.pkl'))
+
+xpaths = {
+    'initial_login' : "/html/body/div/div/div/main/div/div/div[2]/div/form/button",
+    'username' : "/html/body/div/div/div/main/div/div/div[4]/div[1]/form/div[1]/input",
+    'password' : "/html/body/div/div/div/main/div/div/div[4]/div[1]/form/div[2]/input",
+    'login' : "/html/body/div/div/div/main/div/div/div[4]/div[1]/form/button",
+}
+urls = {
+    'login' : "https://public-apps.apexclearing.com/session/#/login/",
+    'activities' : "https://public-api.apexclearing.com/activities-provider/api/v1/activities/",
+}
+cols_dtypes = {
+    'timestamp' : 'datetime64[ns]',
+    'accountNumber' : str,
+    'accountTitle' : str,
+    'symbol' : str,
+    'description' : str,
+    'descriptionLines' : str,
+    'tradeAction' : str,
+    'quantity' : float,
+    'price' : float,
+    'fees' : float,
+    'commissions' : float,
+    'netAmount' : float,
+    'currencyCode' : str,
+    'settleDate' : 'datetime64[ns]',
+    'tradeDate' : 'datetime64[ns]',
+    'tradeNumber' : str,
+    'transferDirection' : str,
+    'activityType' : str,
+    'tagNumber' : str,
+    'trailer' : str,
+    'accountType' : str,
+    'underlyingSymbol' : str,
+    'optionType' : str,
+    'strikePrice' : float,
+    'expirationDate' : 'datetime64[ns]',
+}
+from meerschaum.utils.debug import dprint
+from meerschaum.utils.warnings import warn, error, info
+
+def get_driver(debug : bool = False):
+    """
+    Returns an alive Firefox WebDriver
+    """
+    global driver
+
+    ### webdriver with features from the normal requests lib
+    from seleniumrequests import Firefox
+    ### we need options to start a headless firefox instance
+    from selenium.webdriver.firefox.options import Options
+
+    from selenium.webdriver.remote.command import Command
+    is_alive = None
+    try:
+        driver.execute(Command.STATUS)
+        is_alive = True
+    except:
+        is_alive = False
+
+    if not is_alive:
+        browser_options = Options()
+        browser_options.add_argument('--headless')
+        browser_options.add_argument('--window-size=1920x1080')
+        driver = Firefox(options=browser_options, executable_path=geckodriver_location)
+
+    ### load existing cookies
+    if cookies_path.exists():
+        driver.get(urls['login'])
+        if debug: dprint("Found existing cookies. Attempting to reuse session...")
+        import pickle
+        with open(cookies_path, 'rb') as cookies_file:
+            cookies = pickle.load(cookies_file)
+        for cookie in cookies:
+            driver.add_cookie(cookie)
+
+    return driver
+
+def ask_for_credentials():
+    """
+    Prompt the user for login information and update the Meerschaum configuration file.
+    """
+    from getpass import getpass
+    from prompt_toolkit import prompt
+    username = prompt("Apex Username: ")
+    password = getpass(prompt="Apex Password: ")
+    account  = prompt("Apex account number: ")
+    if 'plugins' not in cf: cf['plugins'] = {}
+    if 'apex' not in cf['plugins']: cf['plugins']['apex'] = {}
+    if 'login' not in cf['plugins']['apex']: cf['plugins']['apex']['login'] = {}
+    cf['plugins']['apex']['login']['username'] = username
+    cf['plugins']['apex']['login']['password'] = password
+    cf['plugins']['apex']['login']['account'] = account
+    write_config(cf)
+    return username, password, account
 
 def fetch(
         pipe : 'meerschaum.Pipe',
@@ -46,75 +140,14 @@ def fetch(
     except:
       pass
 
-    ### webdriver with features from the normal requests lib
-    from seleniumrequests import Firefox
-    ### we need options to start a headless firefox instance
-    from selenium.webdriver.firefox.options import Options
     ### the below imports are needed to wait for elements to load
     from selenium.webdriver.support import expected_conditions as EC
     from selenium.webdriver.support.ui import WebDriverWait
     from selenium.webdriver.common.by import By
     from selenium.common.exceptions import TimeoutException
 
-    xpaths = {
-        'initial_login' : "/html/body/div/div/div/main/div/div/div[2]/div/form/button",
-        'username' : "/html/body/div/div/div/main/div/div/div[4]/div[1]/form/div[1]/input",
-        'password' : "/html/body/div/div/div/main/div/div/div[4]/div[1]/form/div[2]/input",
-        'login' : "/html/body/div/div/div/main/div/div/div[4]/div[1]/form/button",
-    }
-    urls = {
-        'login' : "https://public-apps.apexclearing.com/session/#/login/",
-        'activities' : "https://public-api.apexclearing.com/activities-provider/api/v1/activities/",
-    }
-    cols_dtypes = {
-        'timestamp' : 'datetime64[ns]',
-        'accountNumber' : str,
-        'accountTitle' : str,
-        'symbol' : str,
-        'description' : str,
-        'descriptionLines' : str,
-        'tradeAction' : str,
-        'quantity' : float,
-        'price' : float,
-        'fees' : float,
-        'commissions' : float,
-        'netAmount' : float,
-        'currencyCode' : str,
-        'settleDate' : 'datetime64[ns]',
-        'tradeDate' : 'datetime64[ns]',
-        'tradeNumber' : str,
-        'transferDirection' : str,
-        'activityType' : str,
-        'tagNumber' : str,
-        'trailer' : str,
-        'accountType' : str,
-        'underlyingSymbol' : str,
-        'optionType' : str,
-        'strikePrice' : float,
-        'expirationDate' : 'datetime64[ns]',
-    }
-
-    def ask_for_credentials():
-        """
-        Prompt the user for login information and update the Meerschaum configuration file.
-        """
-        from getpass import getpass
-        username = input("Apex Username: ")
-        password = getpass(prompt="Apex Password: ")
-        account  = input("Apex account number: ")
-        if 'plugins' not in cf: cf['plugins'] = {}
-        if 'apex' not in cf['plugins']: cf['plugins']['apex'] = {}
-        if 'login' not in cf['plugins']['apex']: cf['plugins']['apex']['login'] = {}
-        cf['plugins']['apex']['login']['username'] = username
-        cf['plugins']['apex']['login']['password'] = password
-        cf['plugins']['apex']['login']['account'] = account
-        write_config(cf)
-        return username, password, account
-
     ### modules we'll need later
     import meerschaum as mrsm
-    from meerschaum.utils.debug import dprint
-    from meerschaum.utils.warnings import warn, error
     from meerschaum.utils.misc import import_pandas
     pd = import_pandas()
     import datetime
@@ -133,6 +166,7 @@ def fetch(
 
     def apex_login(debug : bool = False):
         import pickle
+        driver = get_driver()
 
         if debug: dprint("Loading login page...")
         driver.get(urls['login'])
@@ -191,6 +225,7 @@ def fetch(
         """
         Get activities data from Apex and return a pandas dataframe
         """
+        driver = get_driver()
         dfs = []
         if start_date is None: start_date = end_date.replace(year=end_date.year - 2)
         for activity_type in activity_types:
@@ -221,29 +256,15 @@ def fetch(
         return full_df
 
     def main():
-        global driver, geckodriver_location
+        global geckodriver_location
 
         ### ensure geckodriver is installed (Firefox must be installed externally)
         if geckodriver_location is None:
             success_tuple = setup()
             if not success_tuple[0]: error(success_tuple[1])
 
-        ### init browser
-        if driver is None:
-            browser_options = Options()
-            browser_options.add_argument('--headless')
-            browser_options.add_argument('--window-size=1920x1080')
-            driver = Firefox(options=browser_options, executable_path=geckodriver_location)
-
-        ### load existing cookies
-        if cookies_path.exists():
-            driver.get(urls['login'])
-            if debug: dprint("Found existing cookies. Attempting to reuse session...")
-            import pickle
-            with open(cookies_path, 'rb') as cookies_file:
-                cookies = pickle.load(cookies_file)
-            for cookie in cookies:
-                driver.add_cookie(cookie)
+        ### init browser with cookies
+        driver = get_driver(debug=debug)
 
         ### determine begin date parameter
         start_date = begin
@@ -278,9 +299,9 @@ def fetch(
         try:
             df = get_activities(start_date=start_date, debug=debug)
         except Exception as e:
-            print(f"Logging into Apex. Please wait ~10 seconds...")
+            info(f"Logging into Apex. Please wait ~10 seconds...")
             if apex_login(debug=debug):
-                print("Successfully logged into Apex. This session will be reused until the main thread is stopped.")
+                info("Successfully logged into Apex. This session will be reused until the main thread is stopped.")
             df = get_activities(start_date=start_date, debug=debug)
         return df
 
