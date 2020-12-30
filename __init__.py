@@ -1,4 +1,4 @@
-__version__ = '1.0.9'
+__version__ = '1.0.10'
 
 driver = None
 geckodriver_location = None
@@ -113,9 +113,30 @@ def ask_for_credentials():
     """
     from getpass import getpass
     from prompt_toolkit import prompt
-    username = prompt("Apex Username: ")
-    password = getpass(prompt="Apex Password: ")
-    account  = prompt("Apex account number: ")
+    from meerschaum.utils.formatting._shell import clear_screen
+    clear_screen()
+    
+    def get_password():
+        while True:
+            password = getpass(prompt="Apex password: ")
+            _password = getpass(prompt="Confirm Apex password: ")
+            if password != _password:
+                warn("Passwords do not match! Try again")
+                continue
+            else:
+                return password
+
+    while True:
+        try:
+            username = prompt("Apex username: ")
+            account  = prompt("Apex account number: ")
+            password = get_password()
+            break
+        except:
+            return False
+
+    from meerschaum.config import config as cf
+    from meerschaum.config._edit import write_config
     if 'plugins' not in cf: cf['plugins'] = {}
     if 'apex' not in cf['plugins']: cf['plugins']['apex'] = {}
     if 'login' not in cf['plugins']['apex']: cf['plugins']['apex']['login'] = {}
@@ -160,9 +181,16 @@ def fetch(
             apex_password = cf['plugins']['apex']['login']['password']
             apex_account  = cf['plugins']['apex']['login']['account']
         except:
-            ask_for_credentials()
+            if ask_for_credentials() is False:
+                got_login = False
+                break
         else:
+            got_login = True
             break
+
+    if not got_login:
+        warn(f"Failed to get login information. Aborting...")
+        return None
 
     def apex_login(debug : bool = False):
         import pickle
