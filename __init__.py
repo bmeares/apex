@@ -1,4 +1,4 @@
-__version__ = '1.0.10'
+__version__ = '1.0.11'
 
 driver = None
 geckodriver_location = None
@@ -6,6 +6,7 @@ geckodriver_location = None
 required = [
     'selenium-requests',
     'webdriver-manager',
+    'pandas',
 ]
 
 def setup(**kw):
@@ -169,7 +170,7 @@ def fetch(
 
     ### modules we'll need later
     import meerschaum as mrsm
-    from meerschaum.utils.misc import import_pandas
+    from meerschaum.utils.packages import import_pandas
     pd = import_pandas()
     import datetime
     
