@@ -1,4 +1,4 @@
-__version__ = '1.0.11'
+__version__ = '1.0.12'
 
 driver = None
 geckodriver_location = None
@@ -7,6 +7,8 @@ required = [
     'selenium-requests',
     'webdriver-manager',
     'pandas',
+    'requests',
+    'prompt-toolkit',
 ]
 
 def setup(**kw):
