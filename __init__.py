@@ -1,4 +1,4 @@
-__version__ = '1.0.12'
+__version__ = '1.1.0'
 
 driver = None
 geckodriver_location = None
@@ -110,43 +110,36 @@ def get_driver(debug : bool = False):
 
     return driver
 
-def ask_for_credentials():
+def ask_for_credentials(pipe):
     """
     Prompt the user for login information and update the Meerschaum configuration file.
     """
     from getpass import getpass
-    from prompt_toolkit import prompt
+    from meerschaum.utils.prompt import prompt, get_password
     from meerschaum.utils.formatting._shell import clear_screen
     clear_screen()
     
-    def get_password():
-        while True:
-            password = getpass(prompt="Apex password: ")
-            _password = getpass(prompt="Confirm Apex password: ")
-            if password != _password:
-                warn("Passwords do not match! Try again")
-                continue
-            else:
-                return password
-
     while True:
         try:
-            username = prompt("Apex username: ")
-            account  = prompt("Apex account number: ")
-            password = get_password()
+            username = prompt("Apex username:")
+            account  = prompt("Apex account number:")
+            password = get_password(username=username)
             break
         except:
             return False
 
-    from meerschaum.config import config as cf
-    from meerschaum.config._edit import write_config
-    if 'plugins' not in cf: cf['plugins'] = {}
-    if 'apex' not in cf['plugins']: cf['plugins']['apex'] = {}
-    if 'login' not in cf['plugins']['apex']: cf['plugins']['apex']['login'] = {}
-    cf['plugins']['apex']['login']['username'] = username
-    cf['plugins']['apex']['login']['password'] = password
-    cf['plugins']['apex']['login']['account'] = account
-    write_config(cf)
+    from meerschaum.config import get_plugin_config, write_plugin_config
+    cf = get_plugin_config(warn=False)
+    if cf is None: cf = {}
+    if 'login' not in cf:
+        cf['login'] = {}
+    cf['login']['username'] = username
+    cf['login']['password'] = password
+    if 'apex' not in pipe.parameters:
+        pipe.parameters['apex'] = {}
+    pipe.parameters['apex']['account'] = account
+    write_plugin_config(cf)
+    pipe.edit(interactive=False)
     return username, password, account
 
 def fetch(
@@ -177,15 +170,24 @@ def fetch(
     import datetime
     
     ### get credentials from Meerschaum config or the user
-    from meerschaum.config import config as cf, write_config
+    from meerschaum.config import get_plugin_config
     while True:
-        try:
-            apex_username = cf['plugins']['apex']['login']['username']
-            apex_password = cf['plugins']['apex']['login']['password']
-            apex_account  = cf['plugins']['apex']['login']['account']
-        except:
-            if ask_for_credentials() is False:
+        if 'apex' not in pipe.parameters:
+            pipe.parameters['apex'] = {}
+        login_cf = get_plugin_config('login', warn=False)
+        if login_cf is None:
+            login_cf = {}
+        apex_username = login_cf.get('username', None)
+        apex_password = login_cf.get('password', None)
+        apex_account = pipe.parameters['apex'].get('account', None)
+        if apex_username is None or apex_password is None or apex_account is None:
+            creds = ask_for_credentials(pipe)
+            if creds is False:
                 got_login = False
+                break
+            else:
+                apex_username, apex_password, apex_account = creds
+                got_login = True
                 break
         else:
             got_login = True
@@ -308,23 +310,26 @@ def fetch(
         except:
             pipe.columns = {'datetime' : 'timestamp'}
             pipe.instance_connector.edit_pipe(pipe, debug=debug)
-        running_dividends_pipe = mrsm.Pipe('sql:main', f'running_dividends')
-        if running_dividends_pipe.id is None:
-            running_dividends_pipe.parameters = {
-                'columns' : {
-                    'datetime' : 'timestamp',
-                },
-                'fetch' : {
-                    'definition' : f"""
-                    SELECT DISTINCT timestamp, sum("netAmount") OVER (ORDER BY timestamp ASC) AS "running_dividends"
-                    FROM "{pipe}"
-                    WHERE symbol IS NOT NULL AND symbol != ''
-                    AND "transferDirection" = 'INCOMING'
-                    AND "activityType" = 'MONEY_MOVEMENTS'
-                    """,
-                },
-            }
-            running_dividends_pipe.register(debug=debug)
+
+        ### if connecting to a SQL server, register the running dividends pipe.
+        if pipe.instance_connector.type == 'sql':
+            running_dividends_pipe = mrsm.Pipe(pipe.instance_keys, pipe.metric_key + f'_running_dividends', pipe.location_key)
+            if running_dividends_pipe.id is None:
+                running_dividends_pipe.parameters = {
+                    'columns' : {
+                        'datetime' : 'timestamp',
+                    },
+                    'fetch' : {
+                        'definition' : f"""
+                        SELECT DISTINCT timestamp, sum("netAmount") OVER (ORDER BY timestamp ASC) AS "running_dividends"
+                        FROM "{pipe}"
+                        WHERE symbol IS NOT NULL AND symbol != ''
+                        AND "transferDirection" = 'INCOMING'
+                        AND "activityType" = 'MONEY_MOVEMENTS'
+                        """,
+                    },
+                }
+                running_dividends_pipe.register(debug=debug)
 
         ### log in to set the session cookies and fetch the dataframe
         try:
