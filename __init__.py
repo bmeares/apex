@@ -1,4 +1,4 @@
-__version__ = '1.1.0'
+__version__ = '1.1.1'
 
 driver = None
 geckodriver_location = None
@@ -9,6 +9,7 @@ required = [
     'pandas',
     'requests',
     'prompt-toolkit',
+    'python-dateutil',
 ]
 
 def setup(**kw):
@@ -167,6 +168,7 @@ def fetch(
     import meerschaum as mrsm
     from meerschaum.utils.packages import import_pandas
     pd = import_pandas()
+    from dateutil import relativedelta
     import datetime
     
     ### get credentials from Meerschaum config or the user
@@ -301,8 +303,10 @@ def fetch(
 
         ### determine begin date parameter
         start_date = begin
-        if not start_date: start_date = pipe.sync_time
-        if start_date: start_date = start_date.date().replace(day=start_date.day - 1)
+        if not start_date:
+            start_date = pipe.get_sync_time()
+        if start_date:
+            start_date = start_date.date() - relativedelta.relativedelta(days=1)
 
         ### create and configure the Pipes
         try:
