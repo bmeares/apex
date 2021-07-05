@@ -1,4 +1,6 @@
-__version__ = '1.1.2'
+from __future__ import annotations
+
+__version__ = '1.2.0'
 
 driver = None
 geckodriver_location = None
@@ -11,6 +13,8 @@ required = [
     'prompt-toolkit',
     'python-dateutil',
 ]
+
+from meerschaum.utils.typing import Optional, List
 
 def setup(**kw):
     global geckodriver_location
@@ -90,7 +94,7 @@ def get_driver(debug : bool = False):
     try:
         driver.execute(Command.STATUS)
         is_alive = True
-    except:
+    except Exception as e:
         is_alive = False
 
     if not is_alive:
@@ -131,7 +135,8 @@ def ask_for_credentials(pipe):
 
     from meerschaum.config import get_plugin_config, write_plugin_config
     cf = get_plugin_config(warn=False)
-    if cf is None: cf = {}
+    if cf is None:
+        cf = {}
     if 'login' not in cf:
         cf['login'] = {}
     cf['login']['username'] = username
@@ -144,9 +149,9 @@ def ask_for_credentials(pipe):
     return username, password, account
 
 def fetch(
-        pipe : 'meerschaum.Pipe',
-        begin : 'datetime.datetime' = None,
-        debug : bool = False,
+        pipe: 'meerschaum.Pipe',
+        begin: 'datetime.datetime' = None,
+        debug: bool = False,
         **kw
     ) -> 'pd.DataFrame':
     ### SSL fix
@@ -154,9 +159,9 @@ def fetch(
     requests.packages.urllib3.disable_warnings()
     requests.packages.urllib3.util.ssl_.DEFAULT_CIPHERS += ':HIGH:!DH:!aNULL'
     try:
-      requests.packages.urllib3.contrib.pyopenssl.util.ssl_.DEFAULT_CIPHERS += ':HIGH:!DH:!aNULL'
+        requests.packages.urllib3.contrib.pyopenssl.util.ssl_.DEFAULT_CIPHERS += ':HIGH:!DH:!aNULL'
     except:
-      pass
+        pass
 
     ### the below imports are needed to wait for elements to load
     from selenium.webdriver.support import expected_conditions as EC
@@ -199,7 +204,7 @@ def fetch(
         warn(f"Failed to get login information. Aborting...")
         return None
 
-    def apex_login(debug : bool = False):
+    def apex_login(debug: bool = False):
         import pickle
         driver = get_driver()
 
@@ -252,14 +257,16 @@ def fetch(
         return True
 
     def get_activities(
-            activity_types : list = ['TRADES', 'MONEY_MOVEMENTS', 'POSITION_ADJUSTMENTS'],
-            start_date : datetime.date = None,
-            end_date : datetime.date = datetime.date.today(),
-            debug : bool = False
+            activity_types: Optional[List] = None,
+            start_date: datetime.date = None,
+            end_date: datetime.date = datetime.date.today(),
+            debug: bool = False
         ) -> pd.DataFrame:
         """
         Get activities data from Apex and return a pandas dataframe
         """
+        if activity_types is None:
+            activities_types = ['TRADES', 'MONEY_MOVEMENTS', 'POSITION_ADJUSTMENTS']
         driver = get_driver()
         dfs = []
         if start_date is None: start_date = end_date.replace(year=end_date.year - 2)
@@ -317,7 +324,21 @@ def fetch(
 
         ### if connecting to a SQL server, register the running dividends pipe.
         if pipe.instance_connector.type == 'sql':
-            running_dividends_pipe = mrsm.Pipe(pipe.instance_keys, pipe.metric_key + f'_running_dividends', pipe.location_key)
+            from meerschaum.connectors.sql.tools import sql_item_name
+            pipe_name = sql_item_name(str(pipe), pipe.instance_keys)
+            netAmount = sql_item_name('netAmount', pipe.instance_keys)
+            timestamp = sql_item_name('timestamp', pipe.instance_keys)
+            running_dividends = sql_item_name('running_dividends', pipe.instance_keys)
+            transferDirection = sql_item_name('transferDirection', pipe.instance_keys)
+            activityType = sql_item_name('activityType', pipe.instance_keys)
+            symbol = sql_item_name('symbol', pipe.instance_keys)
+
+            running_dividends_pipe = mrsm.Pipe(
+                pipe.instance_keys,
+                pipe.metric_key + f'_running_dividends',
+                pipe.location_key,
+                instance = pipe.instance_keys,
+            )
             if running_dividends_pipe.id is None:
                 running_dividends_pipe.parameters = {
                     'columns' : {
@@ -325,11 +346,11 @@ def fetch(
                     },
                     'fetch' : {
                         'definition' : f"""
-                        SELECT DISTINCT timestamp, sum("netAmount") OVER (ORDER BY timestamp ASC) AS "running_dividends"
-                        FROM "{pipe}"
-                        WHERE symbol IS NOT NULL AND symbol != ''
-                        AND "transferDirection" = 'INCOMING'
-                        AND "activityType" = 'MONEY_MOVEMENTS'
+                        SELECT DISTINCT {timestamp}, sum({netAmount}) OVER (ORDER BY {timestamp} ASC) AS {running_dividends}
+                        FROM {pipe_name}
+                        WHERE {symbol} IS NOT NULL AND {symbol} != ''
+                        AND {transferDirection} = 'INCOMING'
+                        AND {activityType} = 'MONEY_MOVEMENTS'
                         """,
                     },
                 }
