@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-__version__ = '1.2.0'
+__version__ = '1.3.0'
 
 driver = None
 geckodriver_location = None
@@ -266,7 +266,7 @@ def fetch(
         Get activities data from Apex and return a pandas dataframe
         """
         if activity_types is None:
-            activities_types = ['TRADES', 'MONEY_MOVEMENTS', 'POSITION_ADJUSTMENTS']
+            activity_types = ['TRADES', 'MONEY_MOVEMENTS', 'POSITION_ADJUSTMENTS']
         driver = get_driver()
         dfs = []
         if start_date is None: start_date = end_date.replace(year=end_date.year - 2)
@@ -325,13 +325,13 @@ def fetch(
         ### if connecting to a SQL server, register the running dividends pipe.
         if pipe.instance_connector.type == 'sql':
             from meerschaum.connectors.sql.tools import sql_item_name
-            pipe_name = sql_item_name(str(pipe), pipe.instance_keys)
-            netAmount = sql_item_name('netAmount', pipe.instance_keys)
-            timestamp = sql_item_name('timestamp', pipe.instance_keys)
-            running_dividends = sql_item_name('running_dividends', pipe.instance_keys)
-            transferDirection = sql_item_name('transferDirection', pipe.instance_keys)
-            activityType = sql_item_name('activityType', pipe.instance_keys)
-            symbol = sql_item_name('symbol', pipe.instance_keys)
+            pipe_name = sql_item_name(str(pipe), pipe.instance_connector.flavor)
+            netAmount = sql_item_name('netAmount', pipe.instance_connector.flavor)
+            timestamp = sql_item_name('timestamp', pipe.instance_connector.flavor)
+            running_dividends = sql_item_name('running_dividends', pipe.instance_connector.flavor)
+            transferDirection = sql_item_name('transferDirection', pipe.instance_connector.flavor)
+            activityType = sql_item_name('activityType', pipe.instance_connector.flavor)
+            symbol = sql_item_name('symbol', pipe.instance_connector.flavor)
 
             running_dividends_pipe = mrsm.Pipe(
                 pipe.instance_keys,
