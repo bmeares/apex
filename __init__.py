@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-__version__ = '1.3.0'
+__version__ = '1.4.0'
 
 driver = None
 geckodriver_location = None
@@ -24,6 +24,24 @@ def setup(**kw):
     except Exception as e:
         return False, str(e)
     return True, "Success"
+
+def register(pipe):
+    from meerschaum.config import get_plugin_config, write_plugin_config
+    username, password, account = ask_for_credentials(pipe)
+
+    cf = get_plugin_config(warn=False)
+    if cf is None:
+        cf = {}
+    if 'login' not in cf:
+        cf['login'] = {}
+    cf['login']['username'] = username
+    cf['login']['password'] = password
+    write_plugin_config(cf)
+
+    return {
+        'columns': {'datetime': 'timestamp',},
+        'apex': {'account': account,},
+    }
 
 import atexit
 def exit_handler():
@@ -133,19 +151,6 @@ def ask_for_credentials(pipe):
         except:
             return False
 
-    from meerschaum.config import get_plugin_config, write_plugin_config
-    cf = get_plugin_config(warn=False)
-    if cf is None:
-        cf = {}
-    if 'login' not in cf:
-        cf['login'] = {}
-    cf['login']['username'] = username
-    cf['login']['password'] = password
-    if 'apex' not in pipe.parameters:
-        pipe.parameters['apex'] = {}
-    pipe.parameters['apex']['account'] = account
-    write_plugin_config(cf)
-    pipe.edit(interactive=False)
     return username, password, account
 
 def fetch(
