@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-__version__ = '1.4.0'
+__version__ = '1.4.1'
 
 driver = None
 geckodriver_location = None
@@ -330,7 +330,7 @@ def fetch(
         ### if connecting to a SQL server, register the running dividends pipe.
         if pipe.instance_connector.type == 'sql':
             from meerschaum.connectors.sql.tools import sql_item_name
-            pipe_name = sql_item_name(str(pipe), pipe.instance_connector.flavor)
+            pipe_name = sql_item_name(str(pipe.target), pipe.instance_connector.flavor)
             netAmount = sql_item_name('netAmount', pipe.instance_connector.flavor)
             timestamp = sql_item_name('timestamp', pipe.instance_connector.flavor)
             running_dividends = sql_item_name('running_dividends', pipe.instance_connector.flavor)
