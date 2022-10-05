@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-__version__ = '1.4.1'
+__version__ = '2.0.0'
 
 driver = None
 geckodriver_location = None
@@ -108,13 +108,7 @@ def get_driver(debug : bool = False):
     from selenium.webdriver.firefox.options import Options
 
     from selenium.webdriver.remote.command import Command
-    is_alive = None
-    try:
-        driver.execute(Command.STATUS)
-        is_alive = True
-    except Exception as e:
-        is_alive = False
-
+    is_alive = driver is not None
     if not is_alive:
         browser_options = Options()
         browser_options.add_argument('--headless')
@@ -219,29 +213,30 @@ def fetch(
         ### enter username on first page
         if debug: dprint("Waiting for first username textbox...")
         WebDriverWait(driver, 6).until(EC.element_to_be_clickable((By.NAME, 'username')))
-        initial_login = driver.find_element_by_name("username")
-        initial_login.clear()
-        initial_login.send_keys(apex_username)
-        initial_login.find_element_by_xpath(xpaths['initial_login']).click()
+        username_box = driver.find_element(By.XPATH, "//input[@name='username']")
+        username_box.clear()
+        username_box.send_keys(apex_username)
+        login_button = driver.find_element(By.XPATH, "//button[@type='submit']")
+        login_button.click()
 
         #### enter username on real login form
         if debug: dprint("Waiting for second username textbox...")
         WebDriverWait(driver, 6).until(EC.element_to_be_clickable((By.XPATH, xpaths['username'])))
-        user_login = driver.find_element_by_xpath(xpaths['username'])
+        user_login = driver.find_element(By.XPATH, xpaths['username'])
         user_login.clear()
         user_login.send_keys(apex_username)
 
         ### enter password
         if debug: dprint("Waiting for password textbox...")
         WebDriverWait(driver, 6).until(EC.element_to_be_clickable((By.XPATH, xpaths['password'])))
-        user_pass = driver.find_element_by_xpath(xpaths['password'])
+        user_pass = driver.find_element(By.XPATH, xpaths['password'])
         user_pass.clear()
         user_pass.send_keys(apex_password)
 
         ### click login
         if debug: dprint("Clicking login button...")
         WebDriverWait(driver, 6).until(EC.element_to_be_clickable((By.XPATH, xpaths['login'])))
-        driver.find_element_by_xpath(xpaths['login']).click()
+        driver.find_element(By.XPATH, xpaths['login']).click()
 
         ### enter account number and press Enter
         if debug: dprint("Waiting for account textbox...")
@@ -250,7 +245,7 @@ def fetch(
         except TimeoutException:
             driver.quit()
             error('Incorrect login. Please check the login information with `mrsm edit config` under plugins:apex:login')
-        account_login = driver.find_element_by_id('account')
+        account_login = driver.find_element(By.XPATH, "//input[@id='account']")
         account_login.clear()
         account_login.send_keys(apex_account)
         account_login.send_keys(u'\ue007')
