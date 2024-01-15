@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-__version__ = '2.0.0'
+__version__ = '2.0.1'
 
 driver = None
 geckodriver_location = None
@@ -113,7 +113,10 @@ def get_driver(debug : bool = False):
         browser_options = Options()
         browser_options.add_argument('--headless')
         browser_options.add_argument('--window-size=1920x1080')
-        driver = Firefox(options=browser_options, executable_path=geckodriver_location)
+        driver = Firefox(
+            options = browser_options,
+            #  executable_path = geckodriver_location,
+        )
 
     ### load existing cookies
     if cookies_path.exists():
